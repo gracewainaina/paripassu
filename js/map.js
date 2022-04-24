@@ -303,6 +303,18 @@ class InteractiveMap {
 		this._placeMarker(landmark)
 	}
 
+	removeLandmark(landmark){
+		var index = this.landmarks.indexOf(landmark)
+		console.log("found ind")
+		console.log(index)
+		console.log(this.landmarks)
+		if (index > -1){
+			this.landmarks.splice(index, 1)
+		}
+		console.log(this.landmarks)
+	}
+
+
 
 	loadLandmarks(landmark_set, filterLandmarks) {
 

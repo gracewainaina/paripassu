@@ -22,8 +22,9 @@ let gameState = {
 	messages: [],
 	ticks: 0,
 	pointRate: 1,
-	healthPoints: 300,
+	healthPoints: 150,
 	maxHealthPoints: 300,
+	gameOver: false,
 }
 
 let badPlaces = [
@@ -75,6 +76,7 @@ let map = new InteractiveMap({
 			this.createLandmark({
 				pos: position,
 				name: words.getRandomWord(),
+				points: isBad(position) ? Math.floor(Math.random()*-10 - 1) : 1, // flat subtract from points if -, add to rate if +
 			})
 		}
 	},
@@ -84,12 +86,16 @@ let map = new InteractiveMap({
 		//does the update of how many points you have unlocked go here?
 		gameState.ticks += 1;
 		if (gameState.ticks % 10 === 0){
-			gameState.points += gameState.pointRate;
+			if (!gameState.gameOver)
+				gameState.points += gameState.pointRate;
 
 			// player has started exploring, begin decrementing health
-			if(gameState.captured.length > 0){
+			if(gameState.captured.length > 0 && gameState.healthPoints > 0){
 				gameState.healthPoints -= 1
 			}
+
+			if (gameState.healthPoints === 0)
+				gameState.gameOver = true;
 
 			// also decrement the landmarks down to zero over time
 			// this.landmarks.forEach(landmark => {
@@ -111,18 +117,12 @@ let map = new InteractiveMap({
 		
 		// *You* decide how to create a marker
 		// These aren't used, but could be examples
-		landmark.idNumber = landmarkCount++
+		// landmark.idNumber = landmarkCount++
+
+		// this is used in featureToStyle return type.
+		// previously, the color was made to represent the points, but we want that hidden.
 		landmark.color = [Math.random(), 1, .5]
 
-		// Give it a random number of points
-		//how to give a landmark negative points? 
-		// increased point count since im too lazy to make them decrease by minute or smth
-		console.log(isBad(landmark.pos))
-		if (isBad(landmark.pos))
-			//landmark.points = -10;
-			landmark.points = Math.floor(Math.random()*-10);
-		else
-			landmark.points = Math.floor(Math.random()*10 + 1);
 		return landmark
 	}, 
 
@@ -132,27 +132,42 @@ let map = new InteractiveMap({
 
 		console.log("enter", landmark.name, newLevel)
 		if (newLevel == 2) {
-
-			// Add points to my gamestate
-			gameState.points += landmark.points
-			//gameState.pointRate += 1
-			
-
-			// Have we captured this?
-			if (!gameState.captured.includes(landmark.name)) {
-				gameState.captured.push(landmark.name)
-				// Add a message
-				gameState.messages.push(`You captured ${landmark.name} for ${landmark.points} points`)
+			if (landmark.points <= 0) {
+				
+				// Have we captured this?
+				if (!gameState.captured.includes(landmark.name)) {
+					gameState.points += landmark.points
+					gameState.captured.push(landmark.name)
+					// Add a message
+					gameState.messages.push(`Points decreased! You captured ${landmark.name} and lost ${landmark.points} points`)
+				}
 			}
-
+			else {
+				if (!gameState.captured.includes(landmark.name)) {
+					gameState.pointRate += landmark.points;
+					gameState.captured.push(landmark.name)
+					gameState.messages.push(`You captured ${landmark.name} for +${landmark.points} in point rate`)
+				}
+			}
+			landmark.color = [0, 0, .5]
 		}
 	},
 
 	onExitRange: (landmark, newLevel, oldLevel, dist) => {
 		// What happens when the user EXITS a range around a landmark 
 		// e.g. (2->1, 0->-1)
-		
+		//maybe delete landmark on exit, add new landmark
 		console.log("exit", landmark.name, newLevel)
+		// if (newLevel == 2) {
+			// map.removeLandmark(landmark) 
+			// let position = clonePolarOffset(NU_CENTER, 400*Math.random() + 300, 20*Math.random())
+			// map.createLandmark({
+			// 	pos: position,
+			// 	name: words.getRandomWord(),
+			// 	points: isBad(position) ? Math.floor(Math.random()*-10 - 1) : 1, // flat subtract from points if -, add to rate if +
+			// })
+		// }
+		
 	},
 	
 	
@@ -177,8 +192,8 @@ let map = new InteractiveMap({
 			icon: "person_pin_circle",
 
 			// Colors are in HSL (hue, saturation, lightness)
-			iconColor: [hue, 1, .5],
-			bgColor: [hue, 1, .2],
+			iconColor: landmark.color,
+			bgColor: [0,0,0],
 			noBG: false // skip the background
 		}
 	},
@@ -195,15 +210,26 @@ window.onload = (event) => {
 		<header></header>
 			<div id="main-columns">
 
-				<div class="main-column" style="flex:1;overflow:scroll;max-height:200px">
-					(TODO, add your own gamestate)
-					{{gameState}}
+				<div class="main-column" style="flex:1;overflow:scroll;max-height:1000px">
+					<h2>Game Name</h2>
+					<br>
+					<h2 v-if="gameState.gameOver">GAME OVER</h2>
+
+					<div>
+						<h4>Health: {{gameState.healthPoints}}/{{gameState.maxHealthPoints}}</h4>
+						<h4>Points: {{gameState.points}} ({{gameState.pointRate}} point(s) per sec)</h4>
+						<h4>Messages</h4>
+						<p>{{gameState.messages}}</p>
+						<h3>Captured Landmarks</h3>
+						<p>{{gameState.captured}}</p>
+					</div>
 					
 				</div>
 				
-				<div>
-					<button v-on:click="heal">Get more health! (30 points)</button>
-					<button>Get more landmarks! (30 points)</button>
+				<div style="display: flex; flex-direction: column;">
+					<button v-on:click="heal" style="margin: 5px;">Get more health! (30 points)</button>
+					<button v-on:click="buyLandmark" style="margin: 5px;">Get more landmarks! (30 points)</button>
+					<button v-on:click="restart" style="margin: 5px;">Restart</button>
 				</div>
 
 				<div class="main-column" style="overflow:hidden;width:${MAP_SIZE}px;height:${MAP_SIZE}px">
@@ -226,9 +252,31 @@ window.onload = (event) => {
 		methods: {
 			heal: function(event){
 				if (gameState.points >= 30){
-					gameState.points = -30;
+					gameState.points += -30;
 					gameState.healthPoints = Math.min(300, gameState.healthPoints + 60);
 				}
+			},
+
+			buyLandmark: function(event){
+				if(gameState.points >= 30){
+					gameState.points += -30;
+					let position = clonePolarOffset(NU_CENTER, 400*Math.random() + 300, 20*Math.random())
+					map.createLandmark({
+						pos: position,
+						name: words.getRandomWord(),
+						points: isBad(position) ? Math.floor(Math.random()*-10 - 1) : 1, // flat subtract from points if -, add to rate if +
+					})
+				}
+			},
+
+			endGame: function(event) {
+				if (gameState.healthPoints === 0) {
+					gameState = "Gameover";
+				}
+			},
+
+			restart: function(event){
+				window.location.reload();
 			}
 		},
 
