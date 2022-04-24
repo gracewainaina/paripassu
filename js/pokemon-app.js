@@ -94,7 +94,7 @@ let map = new InteractiveMap({
 				gameState.healthPoints -= 1
 			}
 
-			if (gameState.healthPoints === 0)
+			if (gameState.healthPoints === 0) 
 				gameState.gameOver = true;
 
 			// also decrement the landmarks down to zero over time
