@@ -211,7 +211,7 @@ window.onload = (event) => {
 			<div id="main-columns">
 
 				<div class="main-column" style="flex:1;overflow:scroll;max-height:1000px">
-					<h2>Game Name</h2>
+					<h2>Kaptcha</h2>
 					<br>
 					<h2 v-if="gameState.gameOver">GAME OVER</h2>
 
